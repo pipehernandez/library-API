@@ -21,7 +21,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         username: configService.get<string>('DB_USER'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        // dropSchema: true,
         autoLoadEntities: true,
         synchronize: true,
       })
@@ -29,6 +28,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     }),
     BooksModule],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService,],
 })
 export class AppModule { }

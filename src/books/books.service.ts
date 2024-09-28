@@ -1,10 +1,11 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Book } from './entities/book.entity';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { SearchBookDto } from './dto/search-book.dto';
+import { handleError, handleResponse } from 'src/common/response';
 
 @Injectable()
 export class BooksService {
@@ -12,7 +13,7 @@ export class BooksService {
     @InjectRepository(Book)
     private readonly bookRepository: Repository<Book>) { }
 
-  async create(createBookDto: CreateBookDto): Promise<Book> {
+  async create(createBookDto: CreateBookDto): Promise<any> {
 
     try {
       const lowerCaseTitle = createBookDto.title.toLowerCase();
@@ -20,98 +21,100 @@ export class BooksService {
         ...createBookDto,
         title: lowerCaseTitle
       });
-      return this.bookRepository.save(book)
+      const newBook = await this.bookRepository.save(book)
+      return handleResponse(newBook, 'Book created succesfully', HttpStatus.CREATED);
     } catch (error) {
-      throw new InternalServerErrorException('Failed creating book')
+      handleError(error, 'Failed creating book')
     }
   }
 
-  async findAll(): Promise<Book[] | string> {
+  async findAll(): Promise<any> {
     try {
       const books = await this.bookRepository.find();
       if (books.length === 0) {
-        return 'No books found';
+        return handleResponse([], 'No books found', HttpStatus.NOT_FOUND);
       }
-      return books;
-
+      return handleResponse(books, 'Books found succesfully', HttpStatus.OK);
     } catch (error) {
-      throw new InternalServerErrorException('Failed to get books')
+      handleError(error, 'Failed finding books')
     }
   }
 
-  async findOne(id: number): Promise<Book | string> {
+  async findOne(id: number): Promise<any> {
     try {
-      const book = await this.bookRepository.findOneBy({id});
+      const book = await this.bookRepository.findOneBy({ id });
       if (!book) {
-        return `Book with id ${id} not found`
-        
+        return handleResponse([], 'Book not found', HttpStatus.NOT_FOUND);
       }
-      return book;
+      return handleResponse(book, 'Book found succesfully', HttpStatus.OK);
     } catch (error) {
-      throw new InternalServerErrorException('Failed to get book')
+      handleError(error, 'Failed finding book')
     }
-    
+
   }
 
-  async searchBy(searchBookDto: SearchBookDto): Promise<Book[]>{
+  async searchBy(searchBookDto: SearchBookDto): Promise<any> {
     try {
       const { title, author, publishedDate, genre } = searchBookDto;
-
-      const where: FindOptionsWhere<Book> = {}
-
-      if(title){
-        where.title = title
+      const where: FindOptionsWhere<Book> = {};
+  
+      if (title) {
+        where.title = title;
       }
-
-      if(author){
-        where.author = author
+  
+      if (author) {
+        where.author = author;
       }
-
-      if(publishedDate){
+  
+      if (publishedDate) {
         const date = new Date(publishedDate);
-        if(isNaN(date.getTime())){
-          throw new Error('Invalid date format:(YYYY-MM-DD');
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid date format: YYYY-MM-DD');
         }
-        where.publishedDate = date
+        where.publishedDate = date;
       }
-
-      if(genre){
-        where.genre = genre
+  
+      if (genre) {
+        where.genre = genre;
       }
-
-      const books = await this.bookRepository.find({where});
-      if(books.length === 0){
-        throw new NotFoundException('No books found')
+  
+      const books = await this.bookRepository.find({ where });
+      if (books.length === 0) {
+        return handleResponse([], 'No books found', HttpStatus.NOT_FOUND);
       }
-      return books;
+      return handleResponse(books, 'Books found successfully', HttpStatus.OK);
     } catch (error) {
-      throw new InternalServerErrorException('Failed to search books')
+      console.error(error)
+      handleError(error, 'Failed searching books');
     }
   }
+  
 
-  async update(id: number, updateBookDto: UpdateBookDto): Promise<Partial<Book> | string> {
+  async update(id: number, updateBookDto: UpdateBookDto): Promise<any> {
     try {
-      const bookToUpdate = await this.bookRepository.findOneBy({id})
+      if (!updateBookDto || Object.keys(updateBookDto).length === 0) {
+        throw new NotFoundException('No data to update');
+      }
+      const bookToUpdate = await this.bookRepository.findOneBy({ id })
       if (!bookToUpdate) {
-        return `Book with id ${id} not found`
-        }
-        const updatedBook = await this.bookRepository.merge(bookToUpdate, updateBookDto);
-        return await this.bookRepository.save(updatedBook);
+        return handleResponse([], 'Book not found', HttpStatus.NOT_FOUND);
+      }
+      const updatedBook = await this.bookRepository.merge(bookToUpdate, updateBookDto);
+      return handleResponse(updatedBook, 'Book updated succesfully', HttpStatus.OK)
     } catch (error) {
-      throw new InternalServerErrorException('Failed to update book')
+      handleError(error, 'Failed updating book')
     };
   }
 
-  async remove(id: number): Promise<string> {
+  async remove(id: number): Promise<any> {
     try {
-      const bookToDelete = await this.bookRepository.findOneBy({id})
-      if (!bookToDelete) {
-        return `Book with id ${id} not found`
-        }
-      await this.bookRepository.delete({id});
-      return `Book with id ${id} deleted` 
+      const bookDeleted = await this.bookRepository.delete(id);
+      if (bookDeleted.affected === 0) {
+        return handleResponse([], 'Book not found', HttpStatus.NOT_FOUND);
+      }
+      return handleResponse({}, 'Book deleted succesfully', HttpStatus.NO_CONTENT);
     } catch (error) {
-      throw new InternalServerErrorException('Failed to delete book');
+      handleError(error, 'Failed deleting book')
     };
   }
 }
