@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 
 export const handleResponse = (data: any, message: string, statusCode: HttpStatus) => {
   return {
@@ -6,12 +6,4 @@ export const handleResponse = (data: any, message: string, statusCode: HttpStatu
     message,
     data,
   };
-};
-
-export const handleError = (error: any, message: string) => {
-  throw new HttpException({
-    statusCode: HttpStatus.BAD_REQUEST,
-    message: message || 'An error occurred',
-    error: error.message || 'Internal Server Error',
-  }, HttpStatus.BAD_REQUEST);
 };
